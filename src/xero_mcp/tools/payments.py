@@ -24,11 +24,13 @@ from ._common import (
     WRITES,
     ClientFactory,
     IsoDate,
+    Offset,
     Page,
     compact,
     first,
     guid,
     literal,
+    locate,
     page_result,
     run_tool,
     write_result,
@@ -40,12 +42,14 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
     async def xero_payments_list(
         page: Page = None,
         Status: Annotated[Literal["AUTHORISED", "DELETED"] | None, Field(description="Only payments in this status.")] = None,
+        offset: Offset = None,
     ) -> str:
         """List payments, newest first, 100 per page: date, amount, invoice, bank account and status."""
 
         async def action(client: XeroClient) -> dict:
-            params = compact({"page": page or 1, "where": f"Status=={literal(Status)}" if Status else None, "order": "Date DESC"})
-            return page_result("Payments", await client.get("Payments", params), page)
+            number, start = locate(offset, page)
+            params = compact({"page": number, "where": f"Status=={literal(Status)}" if Status else None, "order": "Date DESC"})
+            return page_result("Payments", await client.get("Payments", params), number, start)
 
         return await run_tool("xero_payments_list", client_factory, action)
 

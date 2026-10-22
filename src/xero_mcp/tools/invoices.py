@@ -24,12 +24,14 @@ from ._common import (
     STATUS_CHANGE,
     WRITES,
     ClientFactory,
+    Offset,
     OptionalIsoDate,
     Page,
     compact,
     first,
     guid,
     literal,
+    locate,
     page_result,
     run_tool,
     write_result,
@@ -56,6 +58,7 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
             Field(description="Only invoices in this status."),
         ] = None,
         Type: Annotated[InvoiceType | None, Field(description="ACCREC = sales invoices, ACCPAY = bills.")] = None,
+        offset: Offset = None,
     ) -> str:
         """List invoices and bills, newest first, 100 per page: number, contact, dates, totals, status.
 
@@ -63,16 +66,17 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         """
 
         async def action(client: XeroClient) -> dict:
+            number, start = locate(offset, page)
             params = compact(
                 {
-                    "page": page or 1,
+                    "page": number,
                     "Statuses": Status,
                     "where": f"Type=={literal(Type)}" if Type else None,
                     "order": "Date DESC",
                     "summaryOnly": True,
                 }
             )
-            return page_result("Invoices", await client.get("Invoices", params), page)
+            return page_result("Invoices", await client.get("Invoices", params), number, start)
 
         return await run_tool("xero_invoices_list", client_factory, action)
 

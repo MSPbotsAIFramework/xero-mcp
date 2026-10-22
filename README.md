@@ -44,6 +44,11 @@ All tools return a JSON string. Ids are UUIDs. List tools return 100 records per
 `{count, page, has_more, next_page}`. Dates are `YYYY-MM-DD`; Xero's legacy `/Date(...)/`
 values in responses are converted to ISO 8601.
 
+`xero_contacts_list`, `xero_invoices_list` and `xero_payments_list` also take `offset` (0-based
+record position, overrides `page`) and return `offset` / `next_offset`: pass `next_offset` to continue. It
+starts right after the last record returned, also when a result was cut to fit the response size limit,
+where the next page number would skip the rest of the cut page.
+
 | Tool | Purpose | Parameters (required in **bold**) |
 |---|---|---|
 | `xero_navigate` | Describe the tools of one Xero area (changes nothing) | **domain** (`contacts`, `invoices`, `payments`, `accounts`, `reports`) |

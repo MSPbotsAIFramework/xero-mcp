@@ -46,6 +46,10 @@ PAGE_SIZE = 100
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 
 Page = Annotated[int | None, Field(description="Page number from 1 (100 records per page).", ge=1)]
+Offset = Annotated[
+    int | None,
+    Field(description="Record position to start from (0-based, overrides page); pass next_offset from the previous result.", ge=0),
+]
 IsoDate = Annotated[str, Field(description="Date as YYYY-MM-DD.", pattern=r"^\d{4}-\d{2}-\d{2}$")]
 OptionalIsoDate = Annotated[str | None, Field(description="Date as YYYY-MM-DD.", pattern=r"^\d{4}-\d{2}-\d{2}$")]
 
@@ -77,11 +81,36 @@ def where_date(field: str, op: str, value: date) -> str:
     return f"{field} {op} DateTime({value.year},{value.month:02d},{value.day:02d})"
 
 
-def page_result(key: str, payload: Any, page: int | None) -> dict:
+def locate(offset: int | None, page: int | None) -> tuple[int, int]:
+    """(page, start) for a read from record ``start``.
+
+    Xero pages by number only, with a fixed PAGE_SIZE records per page, so a position is
+    reached by asking for the page that holds it and skipping the records before it.
+    """
+    start = offset if offset is not None else ((page or 1) - 1) * PAGE_SIZE
+    return start // PAGE_SIZE + 1, start
+
+
+def page_result(key: str, payload: Any, page: int | None, start: int | None = None) -> dict:
+    """Items of page ``page`` plus paging: {key, count, page, has_more, next_page}.
+
+    With ``start`` (from locate) the items begin at that record and the result adds
+    ``offset`` / ``next_offset``: next_offset continues right after the last record returned,
+    also when the result is cut to fit the size limit (a page number cannot: the rest of a
+    cut page is not on any other page).
+    """
     items = payload.get(key) if isinstance(payload, dict) else None
     items = items if isinstance(items, list) else []
     number = page or 1
     more = len(items) >= PAGE_SIZE
+    paging: dict[str, Any] = {}
+    if start is not None:
+        items = items[start - (number - 1) * PAGE_SIZE :]
+        paging = {
+            "offset": start,
+            "next_offset": start + len(items) if more else None,
+            "_resume": {"key": "next_offset", "start": start},
+        }
     return compact(
         {
             key: items,
@@ -89,6 +118,7 @@ def page_result(key: str, payload: Any, page: int | None) -> dict:
             "page": number,
             "has_more": more,
             "next_page": number + 1 if more else None,
+            **paging,
         }
     )
 

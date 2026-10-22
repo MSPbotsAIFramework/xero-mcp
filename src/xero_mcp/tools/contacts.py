@@ -19,7 +19,20 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
 from ..api_client import XeroClient
-from ._common import READ_ONLY, WRITES, ClientFactory, Page, compact, first, guid, page_result, run_tool, write_result
+from ._common import (
+    READ_ONLY,
+    WRITES,
+    ClientFactory,
+    Offset,
+    Page,
+    compact,
+    first,
+    guid,
+    locate,
+    page_result,
+    run_tool,
+    write_result,
+)
 
 Text = Annotated[str | None, Field(description="Optional.")]
 
@@ -31,12 +44,14 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
         where: Annotated[
             str | None, Field(description='Xero filter expression, e.g. ContactStatus=="ACTIVE" or IsSupplier==true.')
         ] = None,
+        offset: Offset = None,
     ) -> str:
         """List contacts (customers and suppliers): name, email, phones, addresses, status; 100 per page."""
 
         async def action(client: XeroClient) -> dict:
-            params = compact({"page": page or 1, "where": (where or "").strip() or None, "order": "Name ASC"})
-            return page_result("Contacts", await client.get("Contacts", params), page)
+            number, start = locate(offset, page)
+            params = compact({"page": number, "where": (where or "").strip() or None, "order": "Name ASC"})
+            return page_result("Contacts", await client.get("Contacts", params), number, start)
 
         return await run_tool("xero_contacts_list", client_factory, action)
 

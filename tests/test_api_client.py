@@ -330,3 +330,106 @@ async def test_aged_payables_summary_buckets_open_bills(monkeypatch):
     assert (first["name"], first["total"], first["invoices"], first["over_90"]) == ("Supplier A", 150.0, 2, 50.0)
     assert result["invoice_count"] == 3
     assert "truncated" not in result
+
+
+# ---- Page-number paging that survives truncation (offset / next_offset) -----------------------------
+# Self-test checklist: a cut page continues right after the last record returned (from page 1 and
+# from a later page); offset aligned / not aligned to a page; offset 0; offset past the end; offset
+# wins over page; page-only calls send the same request as before; no retry hint for a page size.
+# Xero pages by number only, 100 records per page (PAGE_SIZE); the tools have no page-size parameter.
+
+TOTAL = 337
+ROWS = [{"id": i, "name": f"Row {i}", **{f"f{k}": f"value {k}" for k in range(40)}} for i in range(TOTAL)]
+SMALL = [{"id": i} for i in range(TOTAL)]
+
+PAGED_TOOLS = [
+    ("xero_contacts_list", "Contacts"),
+    ("xero_invoices_list", "Invoices"),
+    ("xero_payments_list", "Payments"),
+]
+
+
+def _paged_api(key, rows):
+    def reply(request):
+        number = int(request.url.params["page"])
+        return httpx.Response(200, json={key: rows[(number - 1) * 100 : number * 100]})
+
+    return Recorder({key: reply})
+
+
+def _sent_page(rec, i=0):
+    return int(rec.requests[i].url.params["page"])
+
+
+async def _walk(monkeypatch, rec, tool, key, args):
+    ids, calls, cut = [], 0, 0
+    while True:
+        result = await _call(monkeypatch, rec, tool, args)
+        calls += 1
+        assert "retry_page_size" not in result, result.get("note")
+        cut += bool(result.get("truncated"))
+        ids += [r["id"] for r in result[key]]
+        if result.get("next_offset") is None:
+            return ids, calls, cut
+        args = {k: v for k, v in args.items() if k != "page"} | {"offset": result["next_offset"]}
+        assert calls < 200
+
+
+@pytest.mark.parametrize("tool,key", PAGED_TOOLS)
+async def test_cut_pages_continue_without_gaps_from_page_1(monkeypatch, tool, key):
+    ids, _, cut = await _walk(monkeypatch, _paged_api(key, ROWS), tool, key, {})
+    assert cut > 0  # pages really were cut
+    assert ids == list(range(TOTAL))  # no gaps, no duplicates
+
+
+@pytest.mark.parametrize("tool,key", PAGED_TOOLS)
+async def test_cut_pages_continue_without_gaps_from_a_later_page(monkeypatch, tool, key):
+    rec = _paged_api(key, ROWS)
+    ids, _, cut = await _walk(monkeypatch, rec, tool, key, {"page": 3})
+    assert cut > 0 and _sent_page(rec) == 3
+    assert ids == list(range(200, TOTAL))
+
+
+@pytest.mark.parametrize("tool,key", PAGED_TOOLS)
+@pytest.mark.parametrize("offset,page,next_offset", [(130, 2, 200), (200, 3, 300), (0, 1, 100), (330, 4, None)])
+async def test_offset_reads_the_page_that_holds_it(monkeypatch, tool, key, offset, page, next_offset):
+    rec = _paged_api(key, SMALL)
+    result = await _call(monkeypatch, rec, tool, {"offset": offset})
+    assert _sent_page(rec) == page and "offset" not in rec.requests[0].url.params
+    assert result[key][0]["id"] == offset and result["offset"] == offset
+    assert result.get("next_offset") == next_offset  # rest of the page returned, next page starts after it
+
+
+@pytest.mark.parametrize("tool,key", PAGED_TOOLS)
+async def test_offset_past_the_end_is_empty(monkeypatch, tool, key):
+    result = await _call(monkeypatch, _paged_api(key, SMALL), tool, {"offset": 1000})
+    assert (result["count"], result["has_more"], result.get("next_offset")) == (0, False, None)
+
+
+@pytest.mark.parametrize("tool,key", PAGED_TOOLS)
+async def test_offset_wins_over_page(monkeypatch, tool, key):
+    rec = _paged_api(key, SMALL)
+    result = await _call(monkeypatch, rec, tool, {"offset": 150, "page": 5})
+    assert _sent_page(rec) == 2 and result[key][0]["id"] == 150
+
+
+@pytest.mark.parametrize("tool,key", PAGED_TOOLS)
+@pytest.mark.parametrize("args,page", [({"page": 2}, 2), ({}, 1)])
+async def test_page_only_sends_the_same_request_as_before(monkeypatch, tool, key, args, page):
+    rec = _paged_api(key, SMALL)
+    result = await _call(monkeypatch, rec, tool, args)
+    assert _sent_page(rec) == page and "offset" not in rec.requests[0].url.params
+    assert [r["id"] for r in result[key]] == list(range((page - 1) * 100, page * 100))
+    assert (result["page"], result["next_page"], result["offset"], result["next_offset"], result["has_more"]) == (
+        page,
+        page + 1,
+        (page - 1) * 100,
+        page * 100,
+        True,
+    )
+
+
+async def test_contacts_search_paging_is_unchanged(monkeypatch):
+    rec = Recorder({"Contacts": {"Contacts": [{"ContactID": str(i)} for i in range(100)]}})
+    result = await _call(monkeypatch, rec, "xero_contacts_search", {"term": "acme"})
+    assert "offset" not in result and "next_offset" not in result and result["next_page"] == 2
