@@ -252,11 +252,9 @@ async def test_accounts_list_filters(monkeypatch):
 
 
 async def test_accounts_type_cannot_inject_into_the_filter(monkeypatch):
-    from mcp.server.fastmcp.exceptions import ToolError
-
     rec = Recorder()
-    with pytest.raises(ToolError):
-        await _call(monkeypatch, rec, "xero_accounts_list", {"Type": 'BANK" OR 1==1'})
+    out = await _call(monkeypatch, rec, "xero_accounts_list", {"Type": 'BANK" OR 1==1'})
+    assert out["error"]["code"] == "invalid_argument"
     assert rec.requests == []
 
 
