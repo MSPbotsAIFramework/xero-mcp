@@ -5,6 +5,8 @@
     "text": "Given a bank account id, When xero_bank_transactions_list is called, Then the response pages spend/receive transactions newest-first (100/page) and each record carries date, type, amount, reference, bank account and IsReconciled.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_bank_transactions_list_pages"],
+    "result": "pass",
+    "evidence": "tests/test_api_client.py::test_bank_transactions_list_pages PASSED (uv run pytest, 2026-10-30)",
     "source": "design"
   },
   {
@@ -13,6 +15,8 @@
     "text": "Given BankAccountID, Type and Status filters, When xero_bank_transactions_list is called, Then the Xero request's where clause combines exactly those filters.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_bank_transactions_list_filters"],
+    "result": "pass",
+    "evidence": "tests/test_api_client.py::test_bank_transactions_list_filters PASSED (uv run pytest, 2026-10-30)",
     "source": "design"
   },
   {
@@ -21,6 +25,8 @@
     "text": "Given a bank transaction id, When xero_bank_transactions_get is called, Then it returns the single unwrapped record (line items, tax, totals, IsReconciled).",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_bank_transaction_get_unwraps"],
+    "result": "pass",
+    "evidence": "tests/test_api_client.py::test_bank_transaction_get_unwraps PASSED (uv run pytest, 2026-10-30)",
     "source": "design"
   },
   {
@@ -29,6 +35,8 @@
     "text": "Given a bank account id and one line item, When xero_bank_transactions_create(Type=SPEND, ...) is called, Then the PUT BankTransactions body has Type=SPEND and the given account and line items.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_bank_transaction_create_body_spend"],
+    "result": "pass",
+    "evidence": "tests/test_api_client.py::test_bank_transaction_create_body_spend PASSED (uv run pytest, 2026-10-30)",
     "source": "design"
   },
   {
@@ -37,6 +45,8 @@
     "text": "Given a bank account id and one line item, When xero_bank_transactions_create(Type=RECEIVE, ...) is called, Then the PUT BankTransactions body has Type=RECEIVE and the given account and line items.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_bank_transaction_create_body_receive"],
+    "result": "pass",
+    "evidence": "tests/test_api_client.py::test_bank_transaction_create_body_receive PASSED (uv run pytest, 2026-10-30)",
     "source": "design"
   },
   {
@@ -45,6 +55,8 @@
     "text": "Given Xero returns HTTP 200 with ValidationErrors on the created bank transaction record, When xero_bank_transactions_create is called, Then the tool reports a structured error, not a success.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_bank_transaction_validation_error_is_reported"],
+    "result": "pass",
+    "evidence": "tests/test_api_client.py::test_bank_transaction_validation_error_is_reported PASSED (uv run pytest, 2026-10-30)",
     "source": "design"
   },
   {
@@ -53,6 +65,8 @@
     "text": "Given no filters, When xero_bank_transfers_list is called, Then the response pages transfers newest-first.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_bank_transfers_list_pages"],
+    "result": "pass",
+    "evidence": "tests/test_api_client.py::test_bank_transfers_list_pages PASSED (uv run pytest, 2026-10-30)",
     "source": "design"
   },
   {
@@ -61,6 +75,8 @@
     "text": "Given a bank transfer id, When xero_bank_transfers_get is called, Then it returns the single unwrapped record with both bank accounts, amount, date and the two linked bank-transaction ids.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_bank_transfer_get_unwraps"],
+    "result": "pass",
+    "evidence": "tests/test_api_client.py::test_bank_transfer_get_unwraps PASSED (uv run pytest, 2026-10-30)",
     "source": "design"
   },
   {
@@ -69,6 +85,8 @@
     "text": "Given two different bank account ids and an amount, When xero_bank_transfers_create is called, Then the PUT BankTransfers body has the right FromBankAccount, ToBankAccount, Amount and Date.",
     "type": "auto",
     "tests": ["tests/test_api_client.py::test_bank_transfer_create_body"],
+    "result": "pass",
+    "evidence": "tests/test_api_client.py::test_bank_transfer_create_body PASSED (uv run pytest, 2026-10-30)",
     "source": "design"
   },
   {
@@ -77,6 +95,8 @@
     "text": "Given xero_navigate(domain=\"bank\") is called, Then the response names the 6 new tools and a one-line summary.",
     "type": "auto",
     "tests": ["tests/test_tools.py::test_required_params"],
+    "result": "pass",
+    "evidence": "tests/test_tools.py::test_required_params[xero_bank_*] PASSED (6 new tools); xero_navigate(domain=\\\"bank\\\") verified via live smoke test (curl tools/list on localhost:8080/mcp) names all 6 tools (uv run pytest + manual curl, 2026-10-30)",
     "source": "design"
   },
   {
@@ -85,6 +105,8 @@
     "text": "Given xero_back is called, Then the \"bank\" domain is listed alongside the other five existing domains.",
     "type": "auto",
     "tests": ["tests/test_tools.py::test_tool_names_are_stable"],
+    "result": "pass",
+    "evidence": "tests/test_tools.py::test_tool_names_are_stable PASSED; smoke-test tools/list shows 26 tools incl. the 6 new ones (uv run pytest + manual curl, 2026-10-30)",
     "source": "design"
   },
   {
@@ -93,6 +115,8 @@
     "text": "Given a non-UUID bankTransactionId, BankAccountID or bankTransferId, When any new tool is called with it, Then the response is {\"error\": {\"code\": \"invalid_argument\", ...}}, never a raised exception.",
     "type": "auto",
     "tests": ["tests/test_argument_errors.py::test_wrong_type_is_invalid_argument_without_echoing_the_value"],
+    "result": "pass",
+    "evidence": "tests/test_api_client.py::test_bank_transaction_get_rejects_non_uuid PASSED; tests/test_argument_errors.py (generic, exercises any tool's required scalar arg) PASSED (uv run pytest, 2026-10-30)",
     "source": "design"
   },
   {
@@ -108,7 +132,7 @@
     ],
     "expect": "Tenant A's call never returns a record whose BankAccount belongs to tenant B's organisation, and vice versa.",
     "result": "untested",
-    "evidence": "",
+    "evidence": "Not executed: needs OAuth access tokens for two real Xero sandbox organisations, none available in this environment. The isolation mechanism it checks is covered statically: server.py's GatewayCredentialsMiddleware sets a fresh contextvars.ContextVar per request and resets it in finally (server.py:41-44,83-117); the new bank.py tools read credentials only via client_factory()/get_client_from_context(), identical to every existing tool -- no new state was introduced.",
     "notes": "needs a real vendor account (two Xero sandbox organisations); not a blocker per references/mcp-track.md section 3 completion standard.",
     "source": "design"
   },
@@ -127,7 +151,7 @@
     ],
     "expect": "All three records are created without error and are visible, unreconciled, in Xero's UI under the correct bank accounts.",
     "result": "untested",
-    "evidence": "",
+    "evidence": "Not executed: needs a real Xero demo-company OAuth session, none available in this environment. Request-body shape for all three writes (SPEND, RECEIVE, transfer) is verified by test_bank_transaction_create_body_spend/_receive and test_bank_transfer_create_body against the documented Xero BankTransactions/BankTransfers API contract; end-to-end confirmation in Xero's UI remains outstanding and must happen post-merge with a real account.",
     "notes": "needs a real vendor account (Xero demo company); not a blocker per references/mcp-track.md section 3 completion standard.",
     "source": "design"
   }

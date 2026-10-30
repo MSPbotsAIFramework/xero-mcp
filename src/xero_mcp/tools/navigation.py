@@ -36,6 +36,17 @@ DOMAINS: dict[str, tuple[str, list[str]]] = {
         ["xero_payments_list", "xero_payments_get", "xero_payments_create"],
     ),
     "accounts": ("Chart of accounts: list by type or class, get.", ["xero_accounts_list", "xero_accounts_get"]),
+    "bank": (
+        "Bank account transactions (spend/receive, with reconciled status) and transfers between accounts: list, get, record.",
+        [
+            "xero_bank_transactions_list",
+            "xero_bank_transactions_get",
+            "xero_bank_transactions_create",
+            "xero_bank_transfers_list",
+            "xero_bank_transfers_get",
+            "xero_bank_transfers_create",
+        ],
+    ),
     "reports": (
         "Profit and loss, balance sheet, aged receivables and aged payables.",
         [
@@ -52,7 +63,7 @@ def register(mcp: FastMCP, client_factory: ClientFactory) -> None:
     @mcp.tool(annotations=LOCAL)
     async def xero_navigate(
         domain: Annotated[
-            Literal["contacts", "invoices", "payments", "accounts", "reports"], Field(description="Area to describe.")
+            Literal["contacts", "invoices", "payments", "accounts", "bank", "reports"], Field(description="Area to describe.")
         ],
     ) -> str:
         """Describe the tools of one Xero area. All tools are already callable; this changes nothing."""

@@ -40,13 +40,26 @@ EXPECTED_TOOLS: dict[str, set[str]] = {
     "xero_payments_create": {"InvoiceID", "AccountID", "Amount", "Date"},
     "xero_accounts_list": set(),
     "xero_accounts_get": {"accountId"},
+    "xero_bank_transactions_list": set(),
+    "xero_bank_transactions_get": {"bankTransactionId"},
+    "xero_bank_transactions_create": {"Type", "BankAccountID", "LineItems", "Date"},
+    "xero_bank_transfers_list": set(),
+    "xero_bank_transfers_get": {"bankTransferId"},
+    "xero_bank_transfers_create": {"FromBankAccountID", "ToBankAccountID", "Amount", "Date"},
     "xero_reports_profit_and_loss": {"fromDate", "toDate"},
     "xero_reports_balance_sheet": {"date"},
     "xero_reports_aged_receivables": {"date"},
     "xero_reports_aged_payables": {"date"},
 }
 
-WRITE_TOOLS = {"xero_contacts_create", "xero_invoices_create", "xero_invoices_update_status", "xero_payments_create"}
+WRITE_TOOLS = {
+    "xero_contacts_create",
+    "xero_invoices_create",
+    "xero_invoices_update_status",
+    "xero_payments_create",
+    "xero_bank_transactions_create",
+    "xero_bank_transfers_create",
+}
 
 
 @pytest.fixture(scope="module")

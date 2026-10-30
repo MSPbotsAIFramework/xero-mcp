@@ -258,6 +258,148 @@ async def test_accounts_type_cannot_inject_into_the_filter(monkeypatch):
     assert rec.requests == []
 
 
+# ---- bank transactions / transfers ------------------------------------------
+
+BANK_ACCOUNT = "dddddddd-eeee-ffff-0000-111111111111"
+BANK_ACCOUNT_2 = "22222222-3333-4444-5555-666666666666"
+BANK_TXN = "77777777-8888-9999-aaaa-bbbbbbbbbbbb"
+BANK_TRANSFER = "cccccccc-dddd-eeee-ffff-000000000000"
+
+
+async def test_bank_transactions_list_pages(monkeypatch):
+    rec = Recorder({"BankTransactions": {"BankTransactions": [{"BankTransactionID": str(i)} for i in range(100)]}})
+    result = await _call(monkeypatch, rec, "xero_bank_transactions_list", {"page": 1})
+    params = rec.requests[0].url.params
+    assert params["order"] == "Date DESC"
+    assert (result["count"], result["has_more"], result["next_page"]) == (100, True, 2)
+
+
+async def test_bank_transactions_list_filters(monkeypatch):
+    rec = Recorder({"BankTransactions": {"BankTransactions": []}})
+    await _call(monkeypatch, rec, "xero_bank_transactions_list", {"BankAccountID": BANK_ACCOUNT, "Type": "SPEND", "Status": "AUTHORISED"})
+    where = rec.requests[0].url.params["where"]
+    assert where == f'BankAccount.AccountID==Guid("{BANK_ACCOUNT}") AND Type=="SPEND" AND Status=="AUTHORISED"'
+
+
+async def test_bank_transaction_get_unwraps(monkeypatch):
+    rec = Recorder({f"BankTransactions/{BANK_TXN}": {"BankTransactions": [{"BankTransactionID": BANK_TXN, "IsReconciled": False}]}})
+    result = await _call(monkeypatch, rec, "xero_bank_transactions_get", {"bankTransactionId": BANK_TXN})
+    assert result == {"BankTransactionID": BANK_TXN, "IsReconciled": False}
+
+
+async def test_bank_transaction_create_body_spend(monkeypatch):
+    rec = Recorder({"PUT BankTransactions": {"BankTransactions": [{"BankTransactionID": BANK_TXN}]}})
+    args = {
+        "Type": "SPEND",
+        "BankAccountID": BANK_ACCOUNT,
+        "LineItems": [{"Description": "Bank fee", "Quantity": 1, "UnitAmount": 12.5, "AccountCode": "404"}],
+        "Date": "2026-10-20",
+        "Reference": "Monthly fee",
+    }
+    await _call(monkeypatch, rec, "xero_bank_transactions_create", args)
+    assert body(rec.requests[0]) == {
+        "BankTransactions": [
+            {
+                "Type": "SPEND",
+                "BankAccount": {"AccountID": BANK_ACCOUNT},
+                "LineItems": [{"Description": "Bank fee", "Quantity": 1.0, "UnitAmount": 12.5, "AccountCode": "404"}],
+                "Date": "2026-10-20",
+                "Reference": "Monthly fee",
+            }
+        ]
+    }
+    assert "Idempotency-Key" in rec.requests[0].headers
+
+
+async def test_bank_transaction_create_body_receive(monkeypatch):
+    rec = Recorder({"PUT BankTransactions": {"BankTransactions": [{"BankTransactionID": BANK_TXN}]}})
+    args = {
+        "Type": "RECEIVE",
+        "BankAccountID": BANK_ACCOUNT,
+        "LineItems": [{"Description": "Ad-hoc deposit", "Quantity": 1, "UnitAmount": 50, "AccountCode": "260"}],
+        "Date": "2026-10-20",
+        "ContactID": CONTACT,
+    }
+    await _call(monkeypatch, rec, "xero_bank_transactions_create", args)
+    assert body(rec.requests[0]) == {
+        "BankTransactions": [
+            {
+                "Type": "RECEIVE",
+                "BankAccount": {"AccountID": BANK_ACCOUNT},
+                "LineItems": [{"Description": "Ad-hoc deposit", "Quantity": 1.0, "UnitAmount": 50.0, "AccountCode": "260"}],
+                "Contact": {"ContactID": CONTACT},
+                "Date": "2026-10-20",
+            }
+        ]
+    }
+
+
+async def test_bank_transaction_validation_error_is_reported(monkeypatch):
+    rec = Recorder(
+        {
+            "PUT BankTransactions": {
+                "BankTransactions": [
+                    {"HasValidationErrors": True, "ValidationErrors": [{"Message": "AccountCode is not valid."}]}
+                ]
+            }
+        }
+    )
+    args = {
+        "Type": "SPEND",
+        "BankAccountID": BANK_ACCOUNT,
+        "LineItems": [{"Description": "x", "Quantity": 1, "UnitAmount": 1, "AccountCode": "999"}],
+        "Date": "2026-10-20",
+    }
+    result = await _call(monkeypatch, rec, "xero_bank_transactions_create", args)
+    assert result["error"]["code"] == "invalid_argument"
+    assert "not valid" in result["error"]["message"]
+
+
+async def test_bank_transaction_get_rejects_non_uuid(monkeypatch):
+    rec = Recorder()
+    result = await _call(monkeypatch, rec, "xero_bank_transactions_get", {"bankTransactionId": "../Invoices"})
+    assert result["error"]["code"] == "invalid_argument"
+    assert rec.requests == []
+
+
+async def test_bank_transfers_list_pages(monkeypatch):
+    rec = Recorder({"BankTransfers": {"BankTransfers": [{"BankTransferID": str(i)} for i in range(5)]}})
+    result = await _call(monkeypatch, rec, "xero_bank_transfers_list", {})
+    assert "where" not in rec.requests[0].url.params
+    assert "order" not in rec.requests[0].url.params
+    assert result["count"] == 5
+
+
+async def test_bank_transfer_get_unwraps(monkeypatch):
+    rec = Recorder(
+        {
+            f"BankTransfers/{BANK_TRANSFER}": {
+                "BankTransfers": [
+                    {
+                        "BankTransferID": BANK_TRANSFER,
+                        "FromBankTransactionID": "f1",
+                        "ToBankTransactionID": "t1",
+                    }
+                ]
+            }
+        }
+    )
+    result = await _call(monkeypatch, rec, "xero_bank_transfers_get", {"bankTransferId": BANK_TRANSFER})
+    assert result == {"BankTransferID": BANK_TRANSFER, "FromBankTransactionID": "f1", "ToBankTransactionID": "t1"}
+
+
+async def test_bank_transfer_create_body(monkeypatch):
+    rec = Recorder({"PUT BankTransfers": {"BankTransfers": [{"BankTransferID": BANK_TRANSFER}]}})
+    args = {"FromBankAccountID": BANK_ACCOUNT, "ToBankAccountID": BANK_ACCOUNT_2, "Amount": 500, "Date": "2026-10-20"}
+    await _call(monkeypatch, rec, "xero_bank_transfers_create", args)
+    assert body(rec.requests[0]) == {
+        "BankTransfers": [
+            {"FromBankAccount": {"AccountID": BANK_ACCOUNT}, "ToBankAccount": {"AccountID": BANK_ACCOUNT_2}, "Amount": 500.0, "Date": "2026-10-20"}
+        ]
+    }
+    assert "Idempotency-Key" in rec.requests[0].headers
+
+
 # ---- reports ---------------------------------------------------------------
 
 REPORT = {
