@@ -2,9 +2,10 @@
 
 An [MCP](https://modelcontextprotocol.io) server for the [Xero](https://www.xero.com)
 Accounting API (2.0). It lets an AI agent read one Xero organisation's contacts, invoices and
-bills, payments, chart of accounts and financial reports (profit and loss, balance sheet, aged
-receivables and payables) and, on explicit request, create contacts, invoices and payments or
-change an invoice's status.
+bills, payments, bank transactions and transfers, chart of accounts and financial reports
+(profit and loss, balance sheet, aged receivables and payables) and, on explicit request,
+create contacts, invoices, payments, bank transactions or transfers, or change an invoice's
+status.
 
 - Transport: MCP Streamable HTTP at `POST /mcp`, health probe at `GET /health`
 - Stateless and multi-tenant: the access token and organisation id arrive on every request as
@@ -123,7 +124,7 @@ where the next page number would skip the rest of the cut page.
 
 | Tool | Purpose | Parameters (required in **bold**) |
 |---|---|---|
-| `xero_navigate` | Describe the tools of one Xero area (changes nothing) | **domain** (`contacts`, `invoices`, `payments`, `accounts`, `reports`) |
+| `xero_navigate` | Describe the tools of one Xero area (changes nothing) | **domain** (`contacts`, `invoices`, `payments`, `accounts`, `bank`, `reports`) |
 | `xero_back` | List every Xero area and its tools (changes nothing) | - |
 | `xero_status` | Check the connection: organisation name, country, base currency, financial year end | - |
 | `xero_contacts_list` | List contacts (customers and suppliers), 100 per page | page, where |
@@ -139,6 +140,12 @@ where the next page number would skip the rest of the cut page.
 | `xero_payments_create` | Record a payment against an authorised invoice or bill (**write**) | **InvoiceID**, **AccountID**, **Amount**, **Date**, Reference |
 | `xero_accounts_list` | List the chart of accounts, optionally by type or class | Type, Class (`ASSET`, `EQUITY`, `EXPENSE`, `LIABILITY`, `REVENUE`) |
 | `xero_accounts_get` | Get one account | **accountId** |
+| `xero_bank_transactions_list` | List bank spend/receive transactions, newest first, each with its reconciled status | page, BankAccountID, Type, Status (`AUTHORISED`, `DELETED`) |
+| `xero_bank_transactions_get` | Get one bank transaction in full | **bankTransactionId** |
+| `xero_bank_transactions_create` | Record money spent from or received into a bank account, not tied to an invoice/bill (**write**) | **Type** (`SPEND`, `RECEIVE`), **BankAccountID**, **LineItems**, **Date**, ContactID, Reference |
+| `xero_bank_transfers_list` | List transfers between bank accounts, newest first | page |
+| `xero_bank_transfers_get` | Get one transfer, including the two linked bank transaction ids | **bankTransferId** |
+| `xero_bank_transfers_create` | Transfer funds between two bank accounts (**write**) | **FromBankAccountID**, **ToBankAccountID**, **Amount**, **Date** |
 | `xero_reports_profit_and_loss` | Profit and Loss for a date range | **fromDate**, **toDate** |
 | `xero_reports_balance_sheet` | Balance Sheet as at a date | **date** |
 | `xero_reports_aged_receivables` | Money owed by customers, aged by days overdue | **date**, contactId |
@@ -205,7 +212,13 @@ uv run pytest
 
 ## Delivery notes
 
-- **Tool count (20).** Kept as is because the tool names are an existing contract.
+- **Tool count (26).** Kept as is because the tool names are an existing contract.
+- **Bank reconciliation (PRD-21293).** `xero_bank_transactions_*`/`xero_bank_transfers_*` cover
+  viewing a bank account's own transactions (with their `IsReconciled` flag) and recording
+  spend/receive entries and transfers — the full extent of "bank reconciliation" reachable
+  through the Accounting API this server uses. Matching an imported bank statement line to a
+  transaction (Xero's "Reconcile" screen) and importing bank feeds are **not** covered: both
+  need the separate Bank Feeds partner API, a different integration shape.
 - **Aged reports.** Xero's aged receivables / payables reports require a contact
   (`contactId`), and the API has no all-contacts version. With `contactId` the tools return
   Xero's report; without it they return a per-contact ageing summary (current, 1-30, 31-60,

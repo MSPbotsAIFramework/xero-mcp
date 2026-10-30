@@ -58,8 +58,10 @@ INSTRUCTIONS = (
     "payables reports (one contact, or an ageing summary of all open "
     "invoices).\n"
     "- xero_status checks the connection and names the organisation.\n"
-    "Creating contacts, invoices or payments and changing an invoice's status "
-    "change the books (an AUTHORISED invoice can be sent to a customer; "
+    "- Bank transactions (spend/receive, each with a reconciled flag) and transfers between "
+    "bank accounts: xero_bank_transactions_list/get/create, xero_bank_transfers_list/get/create.\n"
+    "Creating contacts, invoices, payments or bank transactions/transfers and changing an "
+    "invoice's status change the books (an AUTHORISED invoice can be sent to a customer; "
     "VOIDED cannot be undone): call those tools only when the user explicitly "
     "asks, with the exact values given."
 )
@@ -130,9 +132,9 @@ def create_mcp_server(settings: Settings | None = None) -> FastMCP:
 
     client_factory: Callable[[], XeroClient | None] = get_client_from_context
 
-    from .tools import accounts, contacts, invoices, navigation, payments, reports
+    from .tools import accounts, bank, contacts, invoices, navigation, payments, reports
 
-    for module in (navigation, contacts, invoices, payments, accounts, reports):
+    for module in (navigation, contacts, invoices, payments, accounts, bank, reports):
         module.register(mcp, client_factory)
 
     return mcp
