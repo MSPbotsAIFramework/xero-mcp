@@ -1,0 +1,134 @@
+[
+  {
+    "id": "TC1",
+    "ac": "AC1",
+    "text": "Given a bank account id, When xero_bank_transactions_list is called, Then the response pages spend/receive transactions newest-first (100/page) and each record carries date, type, amount, reference, bank account and IsReconciled.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_bank_transactions_list_pages"],
+    "source": "design"
+  },
+  {
+    "id": "TC2",
+    "ac": "AC1",
+    "text": "Given BankAccountID, Type and Status filters, When xero_bank_transactions_list is called, Then the Xero request's where clause combines exactly those filters.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_bank_transactions_list_filters"],
+    "source": "design"
+  },
+  {
+    "id": "TC3",
+    "ac": "AC2",
+    "text": "Given a bank transaction id, When xero_bank_transactions_get is called, Then it returns the single unwrapped record (line items, tax, totals, IsReconciled).",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_bank_transaction_get_unwraps"],
+    "source": "design"
+  },
+  {
+    "id": "TC4",
+    "ac": "AC3",
+    "text": "Given a bank account id and one line item, When xero_bank_transactions_create(Type=SPEND, ...) is called, Then the PUT BankTransactions body has Type=SPEND and the given account and line items.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_bank_transaction_create_body_spend"],
+    "source": "design"
+  },
+  {
+    "id": "TC5",
+    "ac": "AC4",
+    "text": "Given a bank account id and one line item, When xero_bank_transactions_create(Type=RECEIVE, ...) is called, Then the PUT BankTransactions body has Type=RECEIVE and the given account and line items.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_bank_transaction_create_body_receive"],
+    "source": "design"
+  },
+  {
+    "id": "TC6",
+    "ac": "AC3",
+    "text": "Given Xero returns HTTP 200 with ValidationErrors on the created bank transaction record, When xero_bank_transactions_create is called, Then the tool reports a structured error, not a success.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_bank_transaction_validation_error_is_reported"],
+    "source": "design"
+  },
+  {
+    "id": "TC7",
+    "ac": "AC5",
+    "text": "Given no filters, When xero_bank_transfers_list is called, Then the response pages transfers newest-first.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_bank_transfers_list_pages"],
+    "source": "design"
+  },
+  {
+    "id": "TC8",
+    "ac": "AC6",
+    "text": "Given a bank transfer id, When xero_bank_transfers_get is called, Then it returns the single unwrapped record with both bank accounts, amount, date and the two linked bank-transaction ids.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_bank_transfer_get_unwraps"],
+    "source": "design"
+  },
+  {
+    "id": "TC9",
+    "ac": "AC7",
+    "text": "Given two different bank account ids and an amount, When xero_bank_transfers_create is called, Then the PUT BankTransfers body has the right FromBankAccount, ToBankAccount, Amount and Date.",
+    "type": "auto",
+    "tests": ["tests/test_api_client.py::test_bank_transfer_create_body"],
+    "source": "design"
+  },
+  {
+    "id": "TC10a",
+    "ac": "AC8",
+    "text": "Given xero_navigate(domain=\"bank\") is called, Then the response names the 6 new tools and a one-line summary.",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_required_params"],
+    "source": "design"
+  },
+  {
+    "id": "TC10b",
+    "ac": "AC8",
+    "text": "Given xero_back is called, Then the \"bank\" domain is listed alongside the other five existing domains.",
+    "type": "auto",
+    "tests": ["tests/test_tools.py::test_tool_names_are_stable"],
+    "source": "design"
+  },
+  {
+    "id": "TC11",
+    "ac": "AC9",
+    "text": "Given a non-UUID bankTransactionId, BankAccountID or bankTransferId, When any new tool is called with it, Then the response is {\"error\": {\"code\": \"invalid_argument\", ...}}, never a raised exception.",
+    "type": "auto",
+    "tests": ["tests/test_argument_errors.py::test_wrong_type_is_invalid_argument_without_echoing_the_value"],
+    "source": "design"
+  },
+  {
+    "id": "TC12",
+    "ac": "AC10",
+    "type": "manual",
+    "text": "Given two Xero demo organisations behind two different X-Xero-Tenant-Id values, When the same new tool is called once per organisation, Then each call only returns/affects its own organisation's bank data.",
+    "steps": [
+      "Obtain OAuth access tokens for two separate Xero demo/sandbox organisations (tenant A and tenant B)",
+      "Call xero_bank_transactions_list with tenant A's headers; record the returned BankTransactionIDs",
+      "Call xero_bank_transactions_list with tenant B's headers; record the returned BankTransactionIDs",
+      "Confirm the two id sets are disjoint and each organisation's bank account names match its own chart of accounts"
+    ],
+    "expect": "Tenant A's call never returns a record whose BankAccount belongs to tenant B's organisation, and vice versa.",
+    "result": "untested",
+    "evidence": "",
+    "notes": "needs a real vendor account (two Xero sandbox organisations); not a blocker per references/mcp-track.md section 3 completion standard.",
+    "source": "design"
+  },
+  {
+    "id": "TC13",
+    "ac": "AC3,AC4,AC7",
+    "type": "manual",
+    "text": "End-to-end pass against the Xero demo company: create a SPEND transaction, a RECEIVE transaction, and a transfer between two demo bank accounts.",
+    "steps": [
+      "Authenticate against Xero's public demo company (developer.xero.com demo company OAuth flow)",
+      "Call xero_accounts_list(Type=\"BANK\") and note two bank account ids",
+      "Call xero_bank_transactions_create(Type=\"SPEND\", BankAccountID=<account 1>, LineItems=[...])",
+      "Call xero_bank_transactions_create(Type=\"RECEIVE\", BankAccountID=<account 1>, LineItems=[...])",
+      "Call xero_bank_transfers_create(FromBankAccountID=<account 1>, ToBankAccountID=<account 2>, Amount=50, Date=today)",
+      "Open the demo company in Xero's web UI and confirm all three records appear with IsReconciled=false"
+    ],
+    "expect": "All three records are created without error and are visible, unreconciled, in Xero's UI under the correct bank accounts.",
+    "result": "untested",
+    "evidence": "",
+    "notes": "needs a real vendor account (Xero demo company); not a blocker per references/mcp-track.md section 3 completion standard.",
+    "source": "design"
+  }
+]
